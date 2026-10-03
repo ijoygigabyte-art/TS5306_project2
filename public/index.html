@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operation ARIMA — Interactive Mission Report</title>
+  
+  <!-- KaTeX for rendering math -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  
+  <style>
+    :root {
+      --bg: #f5f6fb;
+      --surface: #ffffff;
+      --glass: rgba(255,255,255,0.72);
+      --glass-border: rgba(180,195,225,0.45);
+      --text: #2d3748;
+      --text-muted: #8b9dc3;
+      --accent: #6b8cce;
+      --accent-light: #dce4f5;
+      --accent-glow: rgba(107,140,206,0.35);
+      --green: #4eba8a;
+      --green-light: rgba(78,186,138,0.12);
+      --code-color: #3a6db5;
+      --math-color: #7c5cbf;
+      --wire: #c5d0e6;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ─── TOP BAR ─── */
+    .topbar {
+      height: 48px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 50;
+      position: relative;
+    }
+
+    .topbar-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .topbar-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .pbar-track {
+      width: 140px;
+      height: 5px;
+      background: var(--accent-light);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .pbar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.5s ease;
+      border-radius: 3px;
+    }
+
+    /* ─── MAIN SPLIT LAYOUT ─── */
+    .split {
+      display: flex;
+      height: calc(100vh - 48px);
+    }
+
+    /* LEFT: JARVIS NARRATOR */
+    .narrator {
+      width: 420px;
+      min-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 30px;
+      position: relative;
+      border-right: 1px solid var(--glass-border);
+      background: var(--surface);
+    }
+
+    /* Sphere */
+    .sphere-wrap {
+      width: 180px;
+      height: 180px;
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .sphere-wrap svg { width:100%; height:100%; overflow:visible; }
+
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes rspin { to { transform: rotate(-360deg); } }
+    @keyframes pulse { 0%,100%{opacity:.25} 50%{opacity:.65} }
+    @keyframes talk  { 0%,100%{r:5} 30%{r:8} 60%{r:6} }
+
+    .r1 { animation: spin 20s linear infinite; transform-origin:90px 90px; }
+    .r2 { animation: rspin 14s linear infinite; transform-origin:90px 90px; }
+    .r3 { animation: spin 26s linear infinite; transform-origin:90px 90px; }
+    .core-pulse { animation: pulse 3s ease-in-out infinite; }
+    .core-talk  { animation: talk 1.5s ease-in-out infinite; }
+
+    /* Narrator speech bubble */
+    .narration {
+      text-align: center;
+      max-width: 340px;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .narr-stage {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .narr-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    .narr-text {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #4a5568;
+    }
+
+    /* Step dots under narration */
+    .step-dots {
+      display: flex;
+      gap: 7px;
+      margin-top: 28px;
+    }
+
+    .sdot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-light);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sdot.done   { background: var(--green); }
+    .sdot.active  { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); transform: scale(1.3); }
+
+    /* Nav arrows */
+    .nav-arrows {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .nav-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1.5px solid var(--glass-border);
+      background: var(--bg);
+      color: var(--text-muted);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    /* RIGHT: SCROLLABLE CARDS */
+    .cards-side {
+      flex: 1;
+      overflow-y: auto;
+      padding: 30px 36px;
+    }
+
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 12px rgba(100,120,170,0.05);
+      opacity: 0.35;
+      filter: grayscale(0.7);
+      transform: scale(0.98);
+      transition: all 0.35s ease;
+      cursor: pointer;
+    }
+
+    .card.active {
+      opacity: 1;
+      filter: none;
+      transform: scale(1);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow), 0 4px 20px rgba(100,120,170,0.08);
+    }
+
+    .card.done {
+      opacity: 1;
+      filter: none;
+      transform: scale(1);
+      border-color: var(--green);
+      cursor: default;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .card-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-light);
+      padding: 2px 9px;
+      border-radius: 20px;
+    }
+
+    .done .card-tag { background: var(--green-light); color: var(--green); }
+
+    .card-status {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .active .card-status { color: var(--accent); }
+    .done .card-status   { color: var(--green); }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    /* Code + Math row */
+    .detail-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .detail-box {
+      background: var(--bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .detail-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .code-text {
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: var(--code-color);
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+
+    .math-text {
+      font-size: 1.0rem;
+      color: var(--math-color);
+    }
+
+    /* Loot pills */
+    .loot-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .loot-pill {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--green-light);
+      color: #2d8a62;
+      border: 1px solid rgba(78,186,138,0.2);
+      font-weight: 500;
+    }
+
+    /* Execute */
+    .exec-btn {
+      margin-top: 14px;
+      width: 100%;
+      padding: 11px;
+      border: 1.5px solid var(--accent);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .exec-btn:hover {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 3px 14px var(--accent-glow);
+    }
+
+    .done .exec-btn { display: none; }
+
+    /* ─── Hinged Flashcard Drawer ─── */
+    .card-scene {
+      perspective: 1200px;
+      margin-bottom: 18px;
+    }
+
+    /* The visible front card stays as-is */
+    .card {
+      position: relative;
+      margin-bottom: 0; /* scene handles gap */
+    }
+
+    /* The drawer lives behind/below, hinged at the top */
+    .card-drawer {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      padding: 0 24px;
+      max-height: 0;
+      overflow: hidden;
+      transform-origin: top center;
+      transform: rotateX(-8deg) scaleY(0);
+      opacity: 0;
+      transition:
+        max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        transform  0.4s  cubic-bezier(0.4, 0, 0.2, 1),
+        opacity    0.3s  ease,
+        padding    0.4s  ease;
+      box-shadow: 0 8px 24px rgba(100,120,170,0.08);
+    }
+
+    .card-drawer.open {
+      max-height: 900px;
+      transform: rotateX(0deg) scaleY(1);
+      opacity: 1;
+      padding: 20px 24px 24px;
+    }
+
+    .drawer-plot {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--glass-border);
+      margin-bottom: 16px;
+      background: var(--bg);
+    }
+
+    .drawer-explain {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .explain-row {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .explain-key {
+      font-family: Consolas, monospace;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+      min-width: 110px;
+    }
+
+    .explain-val {
+      color: #4a5568;
+    }
+
+    .card-toggle-hint {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-align: right;
+      margin-top: 10px;
+      letter-spacing: 0.04em;
+      transition: opacity 0.2s;
+    }
+
+    .drawer-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    /* ─── Chatbot UI ─── */
+    .chatbot {
+      width: 100%;
+      margin-top: auto;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 280px;
+    }
+    .chat-log {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 0.8rem;
+      padding-right: 4px;
+    }
+    .chat-log::-webkit-scrollbar { width: 4px; }
+    .chat-log::-webkit-scrollbar-thumb { background: var(--wire); border-radius: 2px; }
+    
+    .chat-msg {
+      padding: 8px 12px;
+      border-radius: 8px;
+      line-height: 1.4;
+      max-width: 90%;
+    }
+    .chat-msg.user {
+      background: var(--accent);
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+    .chat-msg.jarvis {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      color: var(--text);
+      align-self: flex-start;
+      border-bottom-left-radius: 2px;
+    }
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      outline: none;
+      color: var(--text);
+    }
+    .chat-input:focus { border-color: var(--accent); }
+    .chat-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0 14px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .chat-btn:hover { background: #5778ba; }
+
+    /* Scrollbar */
+    .cards-side::-webkit-scrollbar { width: 5px; }
+    .cards-side::-webkit-scrollbar-track { background: transparent; }
+    .cards-side::-webkit-scrollbar-thumb { background: var(--wire); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-title">Operation ARIMA — USAccDeaths</div>
+    <div class="topbar-progress">
+      <div class="pbar-track"><div class="pbar-fill" id="pbar"></div></div>
+      <span id="pbar-label">0 / 10</span>
+    </div>
+  </div>
+
+  <!-- SPLIT LAYOUT -->
+  <div class="split">
+
+    <!-- LEFT: JARVIS NARRATOR -->
+    <div class="narrator">
+      <div class="sphere-wrap">
+        <svg viewBox="0 0 180 180">
+          <g class="r1">
+            <circle cx="90" cy="90" r="82" fill="none" stroke="#c5d0e6" stroke-width="0.7"/>
+            <line x1="90" y1="6" x2="90" y2="14" stroke="#b0bdd4" stroke-width="0.5"/>
+            <line x1="90" y1="166" x2="90" y2="174" stroke="#b0bdd4" stroke-width="0.5"/>
+            <line x1="6" y1="90" x2="14" y2="90" stroke="#b0bdd4" stroke-width="0.5"/>
+            <line x1="166" y1="90" x2="174" y2="90" stroke="#b0bdd4" stroke-width="0.5"/>
+          </g>
+          <g class="r2">
+            <ellipse cx="90" cy="90" rx="64" ry="32" fill="none" stroke="#b8c8e2" stroke-width="0.6" transform="rotate(25,90,90)"/>
+          </g>
+          <g class="r3">
+            <ellipse cx="90" cy="90" rx="55" ry="28" fill="none" stroke="#cad4ea" stroke-width="0.5" transform="rotate(-30,90,90)"/>
+          </g>
+          <g opacity="0.2" stroke="#a0b0cc" stroke-width="0.4" fill="none">
+            <ellipse cx="90" cy="90" rx="44" ry="72"/>
+            <ellipse cx="90" cy="90" rx="44" ry="72" transform="rotate(60,90,90)"/>
+            <ellipse cx="90" cy="90" rx="44" ry="72" transform="rotate(120,90,90)"/>
+            <circle cx="90" cy="90" r="44"/>
+          </g>
+          <g fill="#8ba4cc" opacity="0.35">
+            <circle cx="90" cy="18" r="1.8"/><circle cx="90" cy="162" r="1.8"/>
+            <circle cx="46" cy="90" r="1.8"/><circle cx="134" cy="90" r="1.8"/>
+            <circle cx="58" cy="48" r="1.8"/><circle cx="122" cy="48" r="1.8"/>
+            <circle cx="58" cy="132" r="1.8"/><circle cx="122" cy="132" r="1.8"/>
+          </g>
+          <circle class="core-pulse" cx="90" cy="90" r="5" fill="#6b8cce" opacity="0.4"/>
+          <circle class="core-talk" cx="90" cy="90" r="3" fill="#6b8cce" opacity="0.7"/>
+          <circle cx="90" cy="90" r="1.5" fill="white"/>
+        </svg>
+      </div>
+
+      <div class="narration" id="narration">
+        <div class="narr-stage" id="narr-stage">Welcome</div>
+        <div class="narr-title" id="narr-title">Let's Demystify ARIMA</div>
+        <div class="narr-text" id="narr-text">Forget the jargon for a minute. We are going to look at 6 years of US accidental deaths, break the data down into its core heartbeat, and build a mathematical model to predict the future. Click a stage to begin.</div>
+      </div>
+
+      <div class="step-dots" id="step-dots"></div>
+
+      <div class="nav-arrows">
+        <button class="nav-btn" onclick="go(-1)">←</button>
+        <button class="nav-btn" id="voice-btn" onclick="toggleVoice()" title="Toggle Voice">🔊</button>
+        <button class="nav-btn" onclick="go(1)">→</button>
+      </div>
+
+      <!-- Chatbot -->
+      <div class="chatbot">
+        <div class="drawer-title" style="margin-bottom:0; border-bottom:none;">J.A.R.V.I.S. Protocol Query</div>
+        <div class="chat-log" id="chat-log">
+          <div class="chat-msg jarvis">Hello. I am JARVIS. Ask me anything about the current stage's code, math, or output.</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" class="chat-input" placeholder="Ask a question..." onkeypress="if(event.key==='Enter') sendChat()">
+          <button class="chat-btn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: CARDS -->
+    <div class="cards-side" id="cards-side"></div>
+
+  </div>
+
+<script>
+const levels = [
+  {
+    tag:"Stage 1", title:"First Look at the Data",
+    narr:"Think of this data like a heartbeat. Every year, accidental deaths predictably spike in the summer when people travel, and dip in the winter. But there's also a slow, hidden drift downward over the years. Our goal? Understand the heartbeat, find the drift, and predict what happens next.",
+    code:`data(USAccDeaths)\ny <- USAccDeaths\nplot(y)\nacf(y, lag.max = 24)`,
+    math:`y_t  (n = 72)`,
+    loot:["n = 72","Peak: July","Trough: Feb","ACF lag 12 = 0.629"],
+    plot:"/figures/fig1_original_series_and_acf.png",
+    explain:[
+      ["n = 72","72 months of data from Jan 1973 to Dec 1978."],
+      ["Peak: July","The summer 'heartbeat' spike (~10k–11k deaths) due to outdoor activity."],
+      ["ACF lag 12","A strong mathematical echo every 12 months, proving the seasonality is real."]
+    ]
+  },
+  {
+    tag:"Stage 2", title:"Removing the Seasons",
+    narr:"How do we study the underlying trend when the loud summer spikes keep getting in the way? We subtract them! By taking each month and subtracting the exact same month from the previous year, we effectively silence the seasonal heartbeat. But notice—a slow downward drift still remains.",
+    code:`s <- diff(y, lag = 12)\nplot(s)\nacf(s, lag.max = 24)`,
+    math:`s_t = y_t − y_{t−12}`,
+    loot:["n = 60","Seasonal peaks reduced","Drift remains in ACF"],
+    plot:"/figures/fig2_seasonal_diff_and_acf.png",
+    explain:[
+      ["n = 60","We lost the first year of data because we needed a past year to subtract from."],
+      ["Seasonal peaks reduced","The massive summer spikes are gone. We flattened the heartbeat."],
+      ["Drift remains","The data still slowly wanders downwards, meaning we aren't done cleaning it yet."]
+    ]
+  },
+  {
+    tag:"Stage 3", title:"Leveling the Playing Field",
+    narr:"To get rid of that lingering drift, we do one more simple trick: we look at the month-to-month *change* rather than the total count. Now, the data is completely leveled out. It just bounces randomly around zero. In statistics, we call this 'stationarity'—it's the stable foundation we need.",
+    code:`x <- diff(s, lag = 1)\nmean(x)  # 28.83\nsd(x)    # 393.10`,
+    math:`x_t = (1−B)(1−B^{12})y_t`,
+    loot:["n = 59","Mean ≈ 0 (p = 0.575)","Stationarity achieved"],
+    plot:"/figures/fig3_stationary_diff_and_acf_pacf.png",
+    explain:[
+      ["n = 59","One more observation lost to calculate the month-to-month change."],
+      ["Mean ≈ 0","The data now averages out perfectly to zero. It's not drifting up or down anymore."],
+      ["SD = 393","The typical random 'bounce' we see from month to month."]
+    ]
+  },
+  {
+    tag:"Stage 4", title:"Finding the Fingerprint",
+    narr:"Now we look for patterns in the leveled-out data. The ACF plot shows us how much a month's data depends on the past. Notice how it drops dead after just one month? That sharp drop-off is the classic 'fingerprint' of a Moving Average (MA) process. It tells us today's shock only impacts tomorrow, and then fades away.",
+    code:`acf(x, lag.max = 24)\npacf(x, lag.max = 24)`,
+    math:`\\hat{\\rho}(1) = -0.3534`,
+    loot:["ACF cuts off at lag 1","PACF tails off","Proposed: MA(1)","Lag 12 correlation noted"],
+    plot:"/figures/fig3_stationary_diff_and_acf_pacf.png",
+    explain:[
+      ["ACF cutoff","A sharp drop after 1 month means whatever happens today only carries over for one single month."],
+      ["PACF tail-off","A slow fade confirms we are looking at a Moving Average (MA) model, not an Autoregressive (AR) one."],
+      ["Lag 12 = −0.34","A tiny echo remains at exactly 12 months. We'll keep an eye on that."]
+    ]
+  },
+  {
+    tag:"Stage 5", title:"Weighing the Impact",
+    narr:"We fit our model, and it gives us a magic number: -0.4876. What does this mean in plain English? It means if there's a random, unexpected spike in deaths this month, the model expects a 'correction' next month, pushing the count back down by about half the size of that spike.",
+    code:`fit <- arima(x,\n  order = c(0,0,1),\n  include.mean = FALSE)`,
+    math:`x_t = \\varepsilon_t + \\theta \\varepsilon_{t-1}`,
+    loot:["θ̂ = −0.4876","s.e. = 0.1208","σ² = 125,806","AIC = 864.51"],
+    plot: null,
+    explain:[
+      ["θ̂ = −0.4876","The correction weight. Every shock carries roughly 49% of its weight into the next month, in the opposite direction."],
+      ["s.e. = 0.1208","How confident we are in that 49% number. A small error means we are very precise."],
+      ["σ² = 125,806","The amount of pure, unpredictable randomness left in the data."],
+      ["AIC = 864.51","A golf score for our model. Lower is better. We'll use this to compare models later."]
+    ]
+  },
+  {
+    tag:"Stage 6", title:"Is it just luck?",
+    narr:"Could that -0.4876 just be a fluke? We calculate a 95% confidence interval, which gives us a range of [-0.72, -0.25]. Because zero isn't anywhere in that range, we can be highly confident this relationship is real. It's not just statistical noise.",
+    code:`ci <- beta + c(-1.96,1.96)*se\n# [-0.7243, -0.2509]`,
+    math:`H_0: \\theta = 0 \\rightarrow \\text{REJECTED}`,
+    loot:["CI excludes 0","Z = −4.038","p < 0.001"],
+    plot: null,
+    explain:[
+      ["95% CI","We are 95% sure the true correction weight is somewhere between 25% and 72%."],
+      ["Z = −4.038","Our number is 4 full steps away from zero. It's definitely not zero."],
+      ["p < 0.001","There is less than a 1-in-1,000 chance that this relationship is just a coincidence."]
+    ]
+  },
+  {
+    tag:"Stage 7", title:"The Bake-Off",
+    narr:"We didn't just pick the first model we found. We pitted it against three other complex models. We use a score called AIC—think of it as a penalty for being overly complicated. Our simple MA(1) model got the lowest, best score. It does the most work with the least amount of fuss.",
+    code:`arima(x, c(0,0,2), ...)\narima(x, c(1,0,0), ...)\narima(x, c(2,0,0), ...)`,
+    math:`\\text{AIC}: 864.5 < 866.2 < 866.5 < 868.2`,
+    loot:["MA(1) = 864.51 ★","MA(2) = 866.24","AR(2) = 866.54","AR(1) = 868.24"],
+    plot: null,
+    explain:[
+      ["AIC = 864.51","The winning 'golf score'. It perfectly balances being accurate without overcomplicating things."],
+      ["MA(2) = 866.24","Trying to look 2 months into the past didn't help. It just made the model messier."],
+      ["AR(1) = 868.24","Trying to base tomorrow strictly on today (Autoregression) performed terribly."]
+    ]
+  },
+  {
+    tag:"Stage 8", title:"Checking the Leftovers",
+    narr:"A good model shouldn't leave any obvious patterns behind in its errors. Our model cleaned up almost everything beautifully. But... if you look closely at the 12-month mark, there's a tiny spike left over. It means there's still a whisper of seasonality our simple model couldn't quite catch.",
+    code:`res <- residuals(fit)\nacf(res, lag.max = 24)`,
+    math:`\\hat{\\rho}_e(12) = -0.301`,
+    loot:["Lags 1–11 white noise","Lag 12 = −0.301","Suggests seasonal MA term","σ² could drop further"],
+    plot:"/figures/fig4_residual_diagnostics.png",
+    explain:[
+      ["Lags 1–11","Perfectly clean. The model captured all the short-term month-to-month behavior."],
+      ["Lag 12 = −0.30","A tiny leftover pattern specifically at the 1-year mark. We missed a spot!"],
+      ["SARIMA extension","If we added a specific 'seasonal' rule to the model, we could easily sweep this last crumb up."]
+    ]
+  },
+  {
+    tag:"Stage 9", title:"Assembling the Council",
+    narr:"Our ARIMA model missed a spot of seasonality. Instead of tweaking it endlessly, we pivot to a real-world strategy: The Ensemble. We bring in two new advisors: ETS (Exponential Smoothing) to track the deep seasons, and NNETAR (a Neural Network) to hunt for invisible patterns. Together, they form a 'Council of Advisors'.",
+    code:`library(forecast)\nm1 <- auto.arima(y)\nm2 <- ets(y)\nm3 <- nnetar(y)`,
+    math:`\\hat{y}_{ens} = \\frac{1}{3}(\\hat{y}_{AR} + \\hat{y}_{ETS} + \\hat{y}_{NN})`,
+    loot:["ARIMA: Math & Momentum","ETS: Seasonal Trends","NNETAR: Hidden Patterns"],
+    plot: null,
+    explain:[
+      ["ARIMA","The rigid mathematician that perfectly handles short-term momentum and bounce."],
+      ["ETS","The trend-follower that excels at capturing deep, repeating seasonal cycles."],
+      ["NNETAR","The AI pattern-hunter that catches weird, non-linear relationships we can't see."]
+    ]
+  },
+  {
+    tag:"Stage 10", title:"The Wisdom of Crowds",
+    narr:"We ask all three advisors to predict December 1978. ARIMA predicts 9,167. ETS predicts 9,210. The Neural Network predicts 9,285. We average them together to get 9,220. The actual observed deaths? 9,240. By hedging our bets, our Ensemble dropped the error rate to an incredible 0.2%!",
+    code:`p1 <- forecast(m1)$mean\np2 <- forecast(m2)$mean\np3 <- forecast(m3)$mean\nans <- (p1+p2+p3)/3`,
+    math:`\\text{APE} = \\frac{|9240 - 9220|}{9240} = 0.21\\%`,
+    loot:["Ensemble: 9,220","Actual: 9,240","Error: 0.21%"],
+    plot: null,
+    explain:[
+      ["Ensemble Prediction","Averaging the three models cancels out their individual weaknesses and biases."],
+      ["0.21% Error","The prediction is off by just 20 deaths nationwide. A massive improvement over the standalone ARIMA model."],
+      ["Real-World Standard","This is exactly how tech giants forecast demand—never trust just one algorithm."]
+    ]
+  }
+];
+
+let current = 0;
+const total = levels.length;
+
+function render() {
+  // Cards
+  const side = document.getElementById('cards-side');
+  side.innerHTML = '';
+  levels.forEach((lvl, i) => {
+    let cls = 'card';
+    let status = 'LOCKED';
+    if (i < current)       { cls += ' done';   status = 'DONE'; }
+    else if (i === current){ cls += ' active'; status = 'ACTIVE'; }
+
+    const pills = lvl.loot.map(l => `<span class="loot-pill">${l}</span>`).join('');
+
+    const plotHtml = lvl.plot ? `<img class="drawer-plot" src="${lvl.plot}" alt="${lvl.title} plot">` : '';
+    const explainHtml = lvl.explain.map(([k,v]) =>
+      `<div class="explain-row"><span class="explain-key">${k}</span><span class="explain-val">${v}</span></div>`
+    ).join('');
+
+    const isUnlocked = i <= current;
+
+    side.innerHTML += `
+      <div class="card-scene">
+        <div class="${cls}" id="card-${i}">
+          <div onclick="${isUnlocked ? `toggleCard(${i})` : ''}" style="cursor:${isUnlocked ? 'pointer' : 'default'}">
+            <div class="card-head">
+              <span class="card-tag">${lvl.tag}</span>
+              <span class="card-status">${status}</span>
+            </div>
+            <div class="card-title">${lvl.title}</div>
+            <div class="detail-row">
+              <div class="detail-box">
+                <div class="detail-label">R Code</div>
+                <div class="code-text">${lvl.code}</div>
+              </div>
+              <div class="detail-box">
+                <div class="detail-label">Math</div>
+                <div class="math-text">${katex.renderToString(lvl.math, {throwOnError: false, displayMode: true})}</div>
+              </div>
+            </div>
+            <div class="loot-row">${pills}</div>
+            ${isUnlocked ? `<div class="card-toggle-hint" id="hint-${i}">▼ details</div>` : ''}
+          </div>
+          ${i === current ? '<button class="exec-btn" onclick="event.stopPropagation(); advance()">Execute & Advance →</button>' : ''}
+        </div>
+
+        <div class="card-drawer" id="drawer-${i}">
+          <div class="drawer-title">Plot & Output Explained</div>
+          ${plotHtml}
+          <div class="drawer-explain">${explainHtml}</div>
+        </div>
+      </div>
+    `;
+
+  });
+
+  // Narrator
+  const lvl = levels[Math.min(current, total - 1)];
+  const stage = current >= total ? 'Complete' : lvl.tag;
+  const title = current >= total ? 'You did it!' : lvl.title;
+  const text  = current >= total
+    ? "We've reached the end of the journey. By breaking down the data, removing the noise, and applying a simple mathematical rule, we built a tool that could see the future within a 1% margin of error. Brilliant work."
+    : lvl.narr;
+
+  document.getElementById('narr-stage').textContent = stage;
+  document.getElementById('narr-title').textContent = title;
+  typewrite(text);
+  speak(text);
+
+  // Dots
+  const dots = document.getElementById('step-dots');
+  dots.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    let dc = 'sdot';
+    if (i < current)       dc += ' done';
+    else if (i === current) dc += ' active';
+    dots.innerHTML += `<div class="${dc}" onclick="jumpTo(${i})"></div>`;
+  }
+
+  // Progress
+  const pct = (current / total) * 100;
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('pbar-label').textContent = `${current} / ${total}`;
+
+  // Scroll active card into view
+  setTimeout(() => {
+    const el = document.getElementById(`card-${Math.min(current, total - 1)}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+function advance() {
+  if (current < total) {
+    current++;
+    render();
+  }
+}
+
+function go(dir) {
+  const next = current + dir;
+  if (next >= 0 && next <= total) {
+    current = next;
+    render();
+  }
+}
+
+function jumpTo(i) {
+  if (i <= current) {
+    current = i;
+    render();
+  }
+}
+
+let openDrawer = -1;
+function toggleCard(i) {
+  if (i > current) return;
+  const drawer = document.getElementById(`drawer-${i}`);
+  const hint   = document.getElementById(`hint-${i}`);
+  if (!drawer) return;
+
+  if (openDrawer === i) {
+    // closing
+    drawer.classList.remove('open');
+    if (hint) hint.textContent = '▼ details';
+    openDrawer = -1;
+  } else {
+    // close previous
+    if (openDrawer >= 0) {
+      const prev = document.getElementById(`drawer-${openDrawer}`);
+      const prevHint = document.getElementById(`hint-${openDrawer}`);
+      if (prev) prev.classList.remove('open');
+      if (prevHint) prevHint.textContent = '▼ details';
+    }
+    drawer.classList.add('open');
+    if (hint) hint.textContent = '▲ close';
+    openDrawer = i;
+    // scroll into view — no audio touch
+    setTimeout(() => {
+      drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 200);
+  }
+}
+
+function updateDots() {
+  const dots = document.getElementById('step-dots');
+  dots.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    let dc = 'sdot';
+    if (i < current)       dc += ' done';
+    else if (i === current) dc += ' active';
+    dots.innerHTML += `<div class="${dc}" onclick="jumpTo(${i})"></div>`;
+  }
+  const pct = (current / total) * 100;
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('pbar-label').textContent = `${current} / ${total}`;
+}
+
+// ─── Voice Narration (Web Speech API) ───
+let voiceEnabled = true;
+let synth = window.speechSynthesis;
+
+function speak(text) {
+  synth.cancel();
+  if (!voiceEnabled) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 1.05;
+  utter.pitch = 0.9;
+  // Prefer a smooth English voice
+  const voices = synth.getVoices();
+  const preferred = voices.find(v => v.name.includes('Google UK English Male'))
+                 || voices.find(v => v.name.includes('David'))
+                 || voices.find(v => v.name.includes('Mark'))
+                 || voices.find(v => v.lang.startsWith('en'));
+  if (preferred) utter.voice = preferred;
+  synth.speak(utter);
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  const btn = document.getElementById('voice-btn');
+  btn.textContent = voiceEnabled ? '🔊' : '🔇';
+  if (!voiceEnabled) synth.cancel();
+}
+
+// Preload voices (some browsers load async)
+if (synth.onvoiceschanged !== undefined) {
+  synth.onvoiceschanged = () => {};
+}
+
+// ─── Typewriter Effect ───
+let typeTimer = null;
+function typewrite(text) {
+  const el = document.getElementById('narr-text');
+  clearInterval(typeTimer);
+  el.textContent = '';
+  let i = 0;
+  typeTimer = setInterval(() => {
+    if (i < text.length) {
+      el.textContent += text.charAt(i);
+      i++;
+    } else {
+      clearInterval(typeTimer);
+    }
+  }, 22);
+}
+
+// ─── Chatbot Integration ───
+let chatHistory = [];
+
+async function sendChat() {
+  const inputEl = document.getElementById('chat-input');
+  const msg = inputEl.value.trim();
+  if (!msg) return;
+
+  appendChat('user', msg);
+  inputEl.value = '';
+
+  const lvl = levels[current];
+  const isFinal = current >= total;
+  const contextText = isFinal 
+    ? "We are at the final summary screen. The MA(1) model generated a December 1978 forecast within 1% of the observed count."
+    : `We are on Stage ${current + 1}: ${lvl.title}. The R Code is: \`${lvl.code}\`. The Math is: \`${lvl.math}\`. The outputs are: ${lvl.loot.join(', ')}. The narrative is: "${lvl.narr}". The detailed explanation is: ${lvl.explain.map(([k,v]) => k + " means " + v).join('. ')}.`;
+  
+  const systemPrompt = "You are JARVIS, functioning as a brilliant, engaging, and intuitive teacher explaining an ARIMA time-series model. Your goal is to explain statistical concepts simply, intuitively, and without dry academic jargon. Use analogies. Explain *why* things matter, not just *what* they are. Always maintain an encouraging and supportive tone. Do not use markdown headers; use plain text and short code blocks. At the end of your response, ask a brief follow-up question to keep the conversation going and check their understanding. Context of the current stage the user is looking at: " + contextText;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...chatHistory,
+    { role: "user", content: msg }
+  ];
+
+  chatHistory.push({ role: "user", content: msg });
+  const loadingId = appendChat('jarvis', '...');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+    const data = await res.json();
+    if (data.reply) {
+      chatHistory.push({ role: "assistant", content: data.reply });
+      updateChat(loadingId, data.reply);
+      speak(data.reply); // Speak the answer out loud
+    } else {
+      updateChat(loadingId, "Error: Offline.");
+    }
+  } catch (err) {
+    updateChat(loadingId, "Error: Network failure.");
+  }
+}
+
+function appendChat(role, text) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  const id = 'msg-' + Date.now();
+  div.id = id;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return id;
+}
+
+function updateChat(id, text) {
+  const div = document.getElementById(id);
+  if (div) {
+    div.textContent = text;
+    const log = document.getElementById('chat-log');
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+render();
+</script>
+</body>
+</html>
