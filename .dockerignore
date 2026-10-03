@@ -1,0 +1,17 @@
+node_modules/
+.env
+.Rhistory
+.RData
+*.log
+.DS_Store
+
+# Ignore assignment / report files (Keep only Node app)
+*.pdf
+*.Rmd
+*.R
+*.docx
+*.md
+submission/
+texfile.*
+jarvis_vector_poc.html
+workflow_graph.html
